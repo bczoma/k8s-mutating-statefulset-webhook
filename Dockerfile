@@ -1,4 +1,4 @@
 FROM alpine:latest
 
-ADD kube-mutating-webhook-tutorial /kube-mutating-webhook-tutorial
-ENTRYPOINT ["./kube-mutating-webhook-tutorial"]
+ADD k8s-mutating-statefulset-webhook /k8s-mutating-statefulset-webhook
+ENTRYPOINT ["./k8s-mutating-statefulset-webhook"]

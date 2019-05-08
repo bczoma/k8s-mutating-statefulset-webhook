@@ -90,7 +90,7 @@ spec:
   template:
     metadata:
       annotations:
-        sidecar-injector-webhook.morven.me/inject: "yes"
+        sidecar-injector-webhook.kenbarr.me/inject: "yes"
       labels:
         app: sleep
     spec:
