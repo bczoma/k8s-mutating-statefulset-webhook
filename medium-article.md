@@ -189,7 +189,7 @@ func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.Admissi
 	}
 }
 ```
-From the code above, the `mutate` function calls [mutationRequired](https://github.com/kenbarrcao/k8s-mutating-statefulset-webhook/blob/master/webhook.go#L98-L130) to detemine whether mutation is required or not. For those requiring mutation, the `mutate` function gets mutation 'patch' from another function [createPatch](https://github.com/kenbarrcao/k8s-mutating-statefulset-webhook/blob/master/webhook.go#L196-L205). Pay attention to the little trick in function `mutationRequired`, we skip the `pods` without annotation `sidecar-injector-webhook.kenbarr.me/inject: true`. That will be mentioned latter when we deployment applications. For complete code, please refer to https://github.com/kenbarrcao/k8s-mutating-statefulset-webhook/blob/master/webhook.go.
+From the code above, the `mutate` function calls [mutationRequired](https://github.com/kenbarrcao/k8s-mutating-statefulset-webhook/blob/master/webhook.go#L98-L130) to detemine whether mutation is required or not. For those requiring mutation, the `mutate` function gets mutation 'patch' from another function [createPatch](https://github.com/kenbarrcao/k8s-mutating-statefulset-webhook/blob/master/webhook.go#L196-L205). Pay attention to the little trick in function `mutationRequired`, we skip the `pods` without annotation `pod-modifier-webhook.solace.com/inject: true`. That will be mentioned latter when we deployment applications. For complete code, please refer to https://github.com/kenbarrcao/k8s-mutating-statefulset-webhook/blob/master/webhook.go.
 
 #### Create Dockerfile and Build the Container
 
@@ -197,10 +197,10 @@ Create the `build` script:
 ```
 dep ensure
 CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o k8s-mutating-statefulset-webhook .
-docker build --no-cache -t kenbarrcao/sidecar-injector:v1 .
+docker build --no-cache -t kenbarrcao/pod-modifier:v1 .
 rm -rf k8s-mutating-statefulset-webhook
 
-docker push kenbarrcao/sidecar-injector:v1
+docker push kenbarrcao/pod-modifier:v1
 ```
 
 And create `Dockerfile` as dependency of build script:
@@ -224,8 +224,8 @@ Step 3/3 : ENTRYPOINT ["./k8s-mutating-statefulset-webhook"]
 Removing intermediate container da6e956d1755
  ---> 619faa936145
 Successfully built 619faa936145
-Successfully tagged kenbarrcao/sidecar-injector:v1
-The push refers to repository [docker.io/kenbarrcao/sidecar-injector]
+Successfully tagged kenbarrcao/pod-modifier:v1
+The push refers to repository [docker.io/kenbarrcao/pod-modifier]
 efd05fe119bb: Pushed
 cd7100a72410: Layer already exists
 v1: digest: sha256:7a4889928ec5a8bcfb91b610dab812e5228d8dfbd2b540cd7a341c11f24729bf size: 739
@@ -238,7 +238,7 @@ Now let's create a Kubernetes `ConfigMap`, which includes `container` and `volum
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: sidecar-injector-webhook-configmap
+  name: pod-modifier-webhook-configmap
 data:
   sidecarconfig.yaml: |
     containers:
@@ -262,7 +262,7 @@ Then deploy the two `ConfigMap`s to cluster:
 [root@mstnode k8s-mutating-statefulset-webhook]# kubectl create -f ./deployment/nginxconfigmap.yaml
 configmap "nginx-configmap" created
 [root@mstnode k8s-mutating-statefulset-webhook]# kubectl create -f ./deployment/configmap.yaml
-configmap "sidecar-injector-webhook-configmap" created
+configmap "pod-modifier-webhook-configmap" created
 ```
 
 #### Create Secret Including Signed key/cert Pair
@@ -290,8 +290,8 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-[ -z ${service} ] && service=sidecar-injector-webhook-svc
-[ -z ${secret} ] && secret=sidecar-injector-webhook-certs
+[ -z ${service} ] && service=pod-modifier-webhook-svc
+[ -z ${secret} ] && secret=pod-modifier-webhook-certs
 [ -z ${namespace} ] && namespace=default
 
 csrName=${service}.${namespace}
@@ -377,36 +377,36 @@ Generating RSA private key, 2048 bit long modulus
 ...........................................+++
 ..........+++
 e is 65537 (0x10001)
-certificatesigningrequest "sidecar-injector-webhook-svc.default" created
+certificatesigningrequest "pod-modifier-webhook-svc.default" created
 NAME                                   AGE       REQUESTOR                                           CONDITION
-sidecar-injector-webhook-svc.default   0s        https://mycluster.icp:9443/oidc/endpoint/OP#admin   Pending
-certificatesigningrequest "sidecar-injector-webhook-svc.default" approved
-secret "sidecar-injector-webhook-certs" created
+pod-modifier-webhook-svc.default   0s        https://mycluster.icp:9443/oidc/endpoint/OP#admin   Pending
+certificatesigningrequest "pod-modifier-webhook-svc.default" approved
+secret "pod-modifier-webhook-certs" created
 ```
 
 #### Create the Sidecar Injector Deployment and Service
 
-The `deployment` brings up 1 `pod` in which the `sidecar-injector` container is running.  The container starts with special arguments:
-- `sidecarCfgFile` pointing to the sidecar injector configuration file mounted from `sidecar-injector-webhook-configmap` ConfigMap created above
-- `tlsCertFile` and `tlsKeyFile` are cert/key pair mounted from `sidecar-injector-webhook-certs` Secret create by script above
+The `deployment` brings up 1 `pod` in which the `pod-modifier` container is running.  The container starts with special arguments:
+- `sidecarCfgFile` pointing to the sidecar injector configuration file mounted from `pod-modifier-webhook-configmap` ConfigMap created above
+- `tlsCertFile` and `tlsKeyFile` are cert/key pair mounted from `pod-modifier-webhook-certs` Secret create by script above
 - `alsologtostderr` `v=4` and `2>&1` are logging arguments
 ```
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: sidecar-injector-webhook-deployment
+  name: pod-modifier-webhook-deployment
   labels:
-    app: sidecar-injector
+    app: pod-modifier
 spec:
   replicas: 1
   template:
     metadata:
       labels:
-        app: sidecar-injector
+        app: pod-modifier
     spec:
       containers:
-        - name: sidecar-injector
-          image: kenbarrcao/sidecar-injector:v1
+        - name: pod-modifier
+          image: kenbarrcao/pod-modifier:v1
           imagePullPolicy: IfNotPresent
           args:
             - -sidecarCfgFile=/etc/webhook/config/sidecarconfig.yaml
@@ -424,40 +424,40 @@ spec:
       volumes:
         - name: webhook-certs
           secret:
-            secretName: sidecar-injector-webhook-certs
+            secretName: pod-modifier-webhook-certs
         - name: webhook-config
           configMap:
-            name: sidecar-injector-webhook-configmap
+            name: pod-modifier-webhook-configmap
 ```
 
-The `service` exposes the `pod` defined above labeled by `app=sidecar-injector` to make it accessible in cluster. This `service` will be referred by the `MutatingWebhookConfiguration` in `clientConfig` section and by default `spec.ports.port` should be **443**(default https port).
+The `service` exposes the `pod` defined above labeled by `app=pod-modifier` to make it accessible in cluster. This `service` will be referred by the `MutatingWebhookConfiguration` in `clientConfig` section and by default `spec.ports.port` should be **443**(default https port).
 ```
 apiVersion: v1
 kind: Service
 metadata:
-  name: sidecar-injector-webhook-svc
+  name: pod-modifier-webhook-svc
   labels:
-    app: sidecar-injector
+    app: pod-modifier
 spec:
   ports:
   - port: 443
     targetPort: 443
   selector:
-    app: sidecar-injector
+    app: pod-modifier
 ```
 
 Next we deploy the above `Deployment` and `Service` to cluster and verify the `sidecar injector` webhook server is running:
 ```
 [root@mstnode k8s-mutating-statefulset-webhook]# kubectl create -f ./deployment/deployment.yaml
-deployment "sidecar-injector-webhook-deployment" created
+deployment "pod-modifier-webhook-deployment" created
 [root@mstnode k8s-mutating-statefulset-webhook]# kubectl create -f ./deployment/service.yaml
-service "sidecar-injector-webhook-svc" created
+service "pod-modifier-webhook-svc" created
 [root@mstnode k8s-mutating-statefulset-webhook]# kubectl get deployment
 NAME                                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
-sidecar-injector-webhook-deployment   1         1         1            1           2m
+pod-modifier-webhook-deployment   1         1         1            1           2m
 [root@mstnode k8s-mutating-statefulset-webhook]# kubectl get pod
 NAME                                                  READY     STATUS    RESTARTS   AGE
-sidecar-injector-webhook-deployment-bbb689d69-fdbgj   1/1       Running   0          3m
+pod-modifier-webhook-deployment-bbb689d69-fdbgj   1/1       Running   0          3m
 ```
 
 #### Configure webhook admission controller on the fly
@@ -469,14 +469,14 @@ For now, we create the `MutatingWebhookConfiguration` manifest with the followin
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: sidecar-injector-webhook-cfg
+  name: pod-modifier-webhook-cfg
   labels:
-    app: sidecar-injector
+    app: pod-modifier
 webhooks:
-  - name: sidecar-injector.kenbarr.me
+  - name: pod-modifier.solace.com
     clientConfig:
       service:
-        name: sidecar-injector-webhook-svc
+        name: pod-modifier-webhook-svc
         namespace: default
         path: "/mutate"
       caBundle: ${CA_BUNDLE}
@@ -487,7 +487,7 @@ webhooks:
         resources: ["pods"]
     namespaceSelector:
       matchLabels:
-        sidecar-injector: enabled
+        pod-modifier: enabled
 ```
 
 Line 8: `name` - name for the webhook, should be fully qualified. Mutiple mutating webhooks are sorted by providing order.
@@ -523,10 +523,10 @@ Then execute:
 Finally we can deploy `MutatingWebhookConfiguration`:
 ```
 [root@mstnode k8s-mutating-statefulset-webhook]# kubectl create -f ./deployment/mutatingwebhook-ca-bundle.yaml
-mutatingwebhookconfiguration "sidecar-injector-webhook-cfg" created
+mutatingwebhookconfiguration "pod-modifier-webhook-cfg" created
 [root@mstnode k8s-mutating-statefulset-webhook]# kubectl get mutatingwebhookconfiguration
 NAME                           AGE
-sidecar-injector-webhook-cfg   11s
+pod-modifier-webhook-cfg   11s
 ```
 
 #### Verification and Troubleshooting
@@ -544,7 +544,7 @@ Typically we create and deploy a sleep application in `default` namespace to see
 >   template:
 >     metadata:
 >       annotations:
->         sidecar-injector-webhook.kenbarr.me/inject: "true"
+>         pod-modifier-webhook.solace.com/inject: "true"
 >       labels:
 >         app: sleep
 >     spec:
@@ -559,7 +559,7 @@ deployment "sleep" created
 
 Pay close attention to the `spec.template.metadata.annotations` as there is a new annotation added:
 ```
-sidecar-injector-webhook.kenbarr.me/inject: "true"
+pod-modifier-webhook.solace.com/inject: "true"
 ```
 The sidecar injector has some logic to check the existence of the above annotation before injecting sidecar container and volume. 
 You're free to delete the logic or customize it before build the sidecar injector container.
@@ -568,17 +568,17 @@ Check the `deployment` and `pod`:
 ```
 [root@mstnode k8s-mutating-statefulset-webhook]# kubectl get deployment
 NAME                                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
-sidecar-injector-webhook-deployment   1         1         1            1           18m
+pod-modifier-webhook-deployment   1         1         1            1           18m
 sleep                                 1         1         1            1           58s
 [root@mstnode k8s-mutating-statefulset-webhook]# kubectl get pod
 NAME                                                  READY     STATUS    RESTARTS   AGE
-sidecar-injector-webhook-deployment-bbb689d69-fdbgj   1/1       Running   0          18m
+pod-modifier-webhook-deployment-bbb689d69-fdbgj   1/1       Running   0          18m
 sleep-6d79d8dc54-r66vz                                1/1       Running   0          1m
 ```
 It's not there. What's going on?
 Let's check the sidecar injector logs:
 ```
-[root@mstnode k8s-mutating-statefulset-webhook]# kubectl logs -f sidecar-injector-webhook-deployment-bbb689d69-fdbgj
+[root@mstnode k8s-mutating-statefulset-webhook]# kubectl logs -f pod-modifier-webhook-deployment-bbb689d69-fdbgj
 I0314 08:48:15.140858       1 webhook.go:88] New configuration: sha256sum 21669464280f76170b88241fd79ecbca3dcebaec5c152a4a9a3e921ff742157f
 
 ```
@@ -587,18 +587,18 @@ So there is a possibility that the issue is caused by configuration in `Mutating
 ```
     namespaceSelector:
       matchLabels:
-        sidecar-injector: enabled
+        pod-modifier: enabled
 ```
 
 #### Control sidecar injector with `namespaceSelector`
 
-We have configured 'namespaceSelector' in `MutatingWebhookConfiguration`, which means only resources in namespace matching the selector will be sent to webhook server. So we need label the `default` namespace with `sidecar-injector=enabled`:
+We have configured 'namespaceSelector' in `MutatingWebhookConfiguration`, which means only resources in namespace matching the selector will be sent to webhook server. So we need label the `default` namespace with `pod-modifier=enabled`:
 
 ```
-[root@mstnode k8s-mutating-statefulset-webhook]# kubectl label namespace default sidecar-injector=enabled
+[root@mstnode k8s-mutating-statefulset-webhook]# kubectl label namespace default pod-modifier=enabled
 namespace "default" labeled
-[root@mstnode k8s-mutating-statefulset-webhook]# kubectl get namespace -L sidecar-injector
-NAME          STATUS    AGE       sidecar-injector
+[root@mstnode k8s-mutating-statefulset-webhook]# kubectl get namespace -L pod-modifier
+NAME          STATUS    AGE       pod-modifier
 default       Active    1d        enabled
 kube-public   Active    1d
 kube-system   Active    1d
@@ -610,7 +610,7 @@ We have configured the `MutatingWebhookConfiguration` resulting in the sidecar i
 pod "sleep-6d79d8dc54-r66vz" deleted
 [root@mstnode k8s-mutating-statefulset-webhook]# kubectl get pods
 NAME                                                  READY     STATUS              RESTARTS   AGE
-sidecar-injector-webhook-deployment-bbb689d69-fdbgj   1/1       Running             0          29m
+pod-modifier-webhook-deployment-bbb689d69-fdbgj   1/1       Running             0          29m
 sleep-6d79d8dc54-b8ztx                                0/2       ContainerCreating   0          3s
 sleep-6d79d8dc54-r66vz                                1/1       Terminating         0          11m
 [root@mstnode k8s-mutating-statefulset-webhook]# kubectl get pod sleep-6d79d8dc54-b8ztx -o yaml
@@ -619,8 +619,8 @@ kind: Pod
 metadata:
   annotations:
     kubernetes.io/psp: default
-    sidecar-injector-webhook.kenbarr.me/inject: "true"
-    sidecar-injector-webhook.kenbarr.me/status: injected
+    pod-modifier-webhook.solace.com/inject: "true"
+    pod-modifier-webhook.solace.com/status: injected
   labels:
     app: sleep
     pod-template-hash: "2835848710"
@@ -668,9 +668,9 @@ But there is a problem for this, with the above configurations, all of the pods 
 
 #### Control sidecar injector with `annotation`
 
-Thanks to flexibility of `MutatingAdmissionWebhook`, we can easily customized the mutating logic to filter resources with specified annotations. Remember the annotation `sidecar-injector-webhook.kenbarr.me/inject: "true"` mentioned above? It can be used as an extra control on sidecar injector. I have written [some code](https://github.com/kenbarrcao/k8s-mutating-statefulset-webhook/blob/master/webhook.go#L98-L130) in webhook server to skip injecting for pod without the annotation.
+Thanks to flexibility of `MutatingAdmissionWebhook`, we can easily customized the mutating logic to filter resources with specified annotations. Remember the annotation `pod-modifier-webhook.solace.com/inject: "true"` mentioned above? It can be used as an extra control on sidecar injector. I have written [some code](https://github.com/kenbarrcao/k8s-mutating-statefulset-webhook/blob/master/webhook.go#L98-L130) in webhook server to skip injecting for pod without the annotation.
 
-Let's give it a try. In this case, we create another sleep application without `sidecar-injector-webhook.kenbarr.me/inject: "true"` annotation in `podTemplateSpec`:
+Let's give it a try. In this case, we create another sleep application without `pod-modifier-webhook.solace.com/inject: "true"` annotation in `podTemplateSpec`:
 ```
 [root@mstnode k8s-mutating-statefulset-webhook]# kubectl delete deployment sleep
 deployment "sleep" deleted
@@ -699,24 +699,24 @@ And then verify the sidecar injector skipped the pod:
 ```
 [root@mstnode k8s-mutating-statefulset-webhook]# kubectl get deployment
 NAME                                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
-sidecar-injector-webhook-deployment   1         1         1            1           45m
+pod-modifier-webhook-deployment   1         1         1            1           45m
 sleep                                 1         1         1            1           17s
 [root@mstnode k8s-mutating-statefulset-webhook]# kubectl get pod
 NAME                                                  READY     STATUS        RESTARTS   AGE
-sidecar-injector-webhook-deployment-bbb689d69-fdbgj   1/1       Running       0          45m
+pod-modifier-webhook-deployment-bbb689d69-fdbgj   1/1       Running       0          45m
 sleep-776b7bcdcd-4bz58                                1/1       Running       0          21s
 ```
 
 The output shows that the sleep application contains only one container, no extra container and volume injected.
 Then we patch the sleep deployment to add the additional annotation and verify it will be injected after recreated:
 ```
-[root@mstnode k8s-mutating-statefulset-webhook]# kubectl patch deployment sleep -p '{"spec":{"template":{"metadata":{"annotations":{"sidecar-injector-webhook.kenbarr.me/inject": "true"}}}}}'
+[root@mstnode k8s-mutating-statefulset-webhook]# kubectl patch deployment sleep -p '{"spec":{"template":{"metadata":{"annotations":{"pod-modifier-webhook.solace.com/inject": "true"}}}}}'
 deployment "sleep" patched
 [root@mstnode k8s-mutating-statefulset-webhook]# kubectl delete pod sleep-776b7bcdcd-4bz58
 pod "sleep-776b7bcdcd-4bz58" deleted
 [root@mstnode k8s-mutating-statefulset-webhook]# kubectl get pods
 NAME                                                  READY     STATUS              RESTARTS   AGE
-sidecar-injector-webhook-deployment-bbb689d69-fdbgj   1/1       Running             0          49m
+pod-modifier-webhook-deployment-bbb689d69-fdbgj   1/1       Running             0          49m
 sleep-3e42ff9e6c-6f87b                                0/2       ContainerCreating   0          18s
 sleep-776b7bcdcd-4bz58                                1/1       Terminating         0          3m
 ```

@@ -6,7 +6,7 @@ This tutoral shows how to build and deploy a [MutatingAdmissionWebhook](https://
 
 Kubernetes 1.9.0 or above with the `admissionregistration.k8s.io/v1beta1` API enabled. Verify that by the following command:
 ```
-kubectl api-versions | grep admissionregistration.k8s.io/v1beta1
+$ kubectl api-versions | grep admissionregistration.k8s.io/v1beta1
 ```
 The result should be:
 ```
@@ -21,58 +21,58 @@ In addition, the `MutatingAdmissionWebhook` and `ValidatingAdmissionWebhook` adm
 
    The repo uses [dep](https://github.com/golang/dep) as the dependency management tool for its Go codebase. Install `dep` by the following command:
 ```
-go get -u github.com/golang/dep/cmd/dep
+$ go get -u github.com/golang/dep/cmd/dep
 ```
 
 2. Build and push docker image
    
 ```
-./build
+$ ./build
 ```
 
 ## Deploy
 
-1. Create a signed cert/key pair and store it in a Kubernetes `secret` that will be consumed by sidecar deployment
+1. Create a signed cert/key pair and store it in a Kubernetes `secret` that will be consumed by pod-modifier deployment
 ```
-./deployment/webhook-create-signed-cert.sh \
-    --service sidecar-injector-webhook-svc \
-    --secret sidecar-injector-webhook-certs \
+$ ./deployment/webhook-create-signed-cert.sh \
+    --service pod-modifier-webhook-svc \
+    --secret pod-modifier-webhook-certs \
     --namespace default
 ```
 
 2. Patch the `MutatingWebhookConfiguration` by set `caBundle` with correct value from Kubernetes cluster
 ```
-cat deployment/mutatingwebhook.yaml | \
+$ cat deployment/mutatingwebhook.yaml | \
     deployment/webhook-patch-ca-bundle.sh > \
     deployment/mutatingwebhook-ca-bundle.yaml
 ```
 
 3. Deploy resources
 ```
-kubectl create -f deployment/nginxconfigmap.yaml
-kubectl create -f deployment/configmap.yaml
-kubectl create -f deployment/deployment.yaml
-kubectl create -f deployment/service.yaml
-kubectl create -f deployment/mutatingwebhook-ca-bundle.yaml
+$ kubectl create -f deployment/nginxconfigmap.yaml
+$ kubectl create -f deployment/configmap.yaml
+$ kubectl create -f deployment/deployment.yaml
+$ kubectl create -f deployment/service.yaml
+$ kubectl create -f deployment/mutatingwebhook-ca-bundle.yaml
 ```
 
 ## Verify
 
-1. The sidecar inject webhook should be running
+1. The pod-modifier inject webhook should be running
 ```
-[root@mstnode ~]# kubectl get pods
+$ kubectl get pods
 NAME                                                  READY     STATUS    RESTARTS   AGE
-sidecar-injector-webhook-deployment-bbb689d69-882dd   1/1       Running   0          5m
-[root@mstnode ~]# kubectl get deployment
+pod-modifier-webhook-deployment-bbb689d69-882dd   1/1       Running   0          5m
+$ kubectl get deployment
 NAME                                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
-sidecar-injector-webhook-deployment   1         1         1            1           5m
+pod-modifier-webhook-deployment   1         1         1            1           5m
 ```
 
-2. Label the default namespace with `sidecar-injector=enabled`
+2. Label the default namespace with `pod-modifier=enabled`
 ```
-kubectl label namespace default sidecar-injector=enabled
-[root@mstnode ~]# kubectl get namespace -L sidecar-injector
-NAME          STATUS    AGE       SIDECAR-INJECTOR
+$ kubectl label namespace default pod-modifier=enabled
+$ kubectl get namespace -L pod-modifier
+NAME          STATUS    AGE       pod-modifier
 default       Active    18h       enabled
 kube-public   Active    18h
 kube-system   Active    18h
@@ -80,7 +80,7 @@ kube-system   Active    18h
 
 3. Deploy an app in Kubernetes cluster, take `sleep` app as an example
 ```
-[root@mstnode ~]# cat <<EOF | kubectl create -f -
+$ cat <<EOF | kubectl create -f -
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
@@ -90,7 +90,7 @@ spec:
   template:
     metadata:
       annotations:
-        sidecar-injector-webhook.kenbarr.me/inject: "yes"
+        pod-modifier-webhook.solace.com/inject: "yes"
       labels:
         app: sleep
     spec:
@@ -104,7 +104,7 @@ EOF
 
 4. Verify sidecar container injected
 ```
-[root@mstnode ~]# kubectl get pods
+$ kubectl get pods
 NAME                     READY     STATUS        RESTARTS   AGE
 sleep-5c55f85f5c-tn2cs   2/2       Running       0          1m
 ```
