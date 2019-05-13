@@ -1,4 +1,4 @@
-# Kubernetes Mutating Admission Webhook for sidecar injection
+# Kubernetes Mutating Admission Webhook for pod modifications
 
 This tutoral shows how to build and deploy a [MutatingAdmissionWebhook](https://kubernetes.io/docs/admin/admission-controllers/#mutatingadmissionwebhook-beta-in-19) that injects a nginx sidecar container into pod prior to persistence of the object.
 
