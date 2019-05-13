@@ -16,7 +16,6 @@ spec:
           image: kenbarr/pod-modifier:v1
           imagePullPolicy: IfNotPresent
           args:
-            - -sidecarCfgFile=/etc/webhook/config/sidecarconfig.yaml
             - -tlsCertFile=/etc/webhook/certs/cert.pem
             - -tlsKeyFile=/etc/webhook/certs/key.pem
             - -alsologtostderr
@@ -26,12 +25,7 @@ spec:
             - name: webhook-certs
               mountPath: /etc/webhook/certs
               readOnly: true
-            - name: webhook-config
-              mountPath: /etc/webhook/config
       volumes:
         - name: webhook-certs
           secret:
             secretName: pod-modifier-webhook-certs
-        - name: webhook-config
-          configMap:
-            name: pod-modifier-webhook-configmap

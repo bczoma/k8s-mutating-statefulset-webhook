@@ -49,8 +49,6 @@ $ cat deployment/mutatingwebhook.yaml | \
 
 3. Deploy resources
 ```
-$ kubectl create -f deployment/nginxconfigmap.yaml
-$ kubectl create -f deployment/configmap.yaml
 $ kubectl create -f deployment/deployment.yaml
 $ kubectl create -f deployment/service.yaml
 $ kubectl create -f deployment/mutatingwebhook-ca-bundle.yaml
@@ -78,33 +76,32 @@ kube-public   Active    18h
 kube-system   Active    18h
 ```
 
-3. Deploy an app in Kubernetes cluster, take `sleep` app as an example
+3. Annotate your statefulset indicating which pod you want to modify and how
 ```
-$ cat <<EOF | kubectl create -f -
-apiVersion: extensions/v1beta1
-kind: Deployment
+apiVersion: apps/v1beta1
+kind: StatefulSet
 metadata:
-  name: sleep
+  :
 spec:
-  replicas: 1
   template:
     metadata:
+         :
       annotations:
-        pod-modifier-webhook.solace.com/inject: "yes"
-      labels:
-        app: sleep
+        pod-modifier.solace.com/inject: "true"
+        pod-modifier.solace.com/modify.podDefinition: |
+          {"Pods":[{"metadata":{"name":"{{ .Release.Name }}-solace-2"},"spec":{"containers": [{"name": "solace","resources": {"limits": {"cpu": "1","memory": "2Gi"},"requests": {"cpu": "500m","memory": "2Gi"} }} ] } } ]}
     spec:
-      containers:
-      - name: sleep
-        image: tutum/curl
-        command: ["/bin/sleep","infinity"]
-        imagePullPolicy: 
-EOF
 ```
 
-4. Verify sidecar container injected
+4. Verify actions of the pod modifier
 ```
-$ kubectl get pods
-NAME                     READY     STATUS        RESTARTS   AGE
-sleep-5c55f85f5c-tn2cs   2/2       Running       0          1m
+AdmissionReview for Kind=/v1, Kind=Pod, Namespace=default Name= (test-run-solace-0) 
+ Create patch for pod: test-run-solace-0/default
+ Pod name is not matching annotation - skipping this pod.
+AdmissionReview for Kind=/v1, Kind=Pod, Namespace=default Name= (test-run-solace-1) 
+ Create patch for pod: test-run-solace-0/default
+ Pod name is not matching annotation - skipping this pod.
+AdmissionReview for Kind=/v1, Kind=Pod, Namespace=default Name= (test-run-solace-2) 
+ Create patch for pod: test-run-solace-0/default
+ AdmissionResponse: patch=[{"op":"replace","path":"/spec/containers/0/resources/requests/cpu","value":"500m"},{"op":"replace","path":"/spec/containers/0/resources/requests/memory","value":"2Gi"}]
 ```
