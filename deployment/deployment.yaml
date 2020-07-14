@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: pod-modifier-webhook-deployment
@@ -6,6 +6,9 @@ metadata:
     app: pod-modifier
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: pod-modifier
   template:
     metadata:
       labels:
