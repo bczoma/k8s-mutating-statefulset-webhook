@@ -6,7 +6,9 @@ This tutoral shows how to build and deploy a [MutatingAdmissionWebhook](https://
 
 Kubernetes 1.9.0 or above with the `admissionregistration.k8s.io/v1beta1` API enabled. Verify that by the following command:
 ```
-$ kubectl api-versions | grep admissionregistration.k8s.io/v1beta1
+$ kubectl api-versions | grep admissionregistration.k8s.io
+admissionregistration.k8s.io/v1
+admissionregistration.k8s.io/v1beta1
 ```
 The result should be:
 ```
