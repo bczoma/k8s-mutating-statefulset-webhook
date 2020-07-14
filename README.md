@@ -16,7 +16,7 @@ admissionregistration.k8s.io/v1
 
 In addition, the `MutatingAdmissionWebhook` and `ValidatingAdmissionWebhook` admission controllers should be added and listed in the correct order in the admission-control flag of kube-apiserver.
 
-## Build
+## Build (Optional)
 
 1. Setup dep
 
@@ -25,7 +25,9 @@ In addition, the `MutatingAdmissionWebhook` and `ValidatingAdmissionWebhook` adm
 $ go get -u github.com/golang/dep/cmd/dep
 ```
 
-2. Build and push docker image
+2. Edit ./build file for target docker repository, currently set to kenbarr/pod-modifier:v1
+
+3. Build and push docker image
    
 ```
 $ ./build
