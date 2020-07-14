@@ -92,7 +92,7 @@ spec:
       annotations:
         pod-modifier.solace.com/inject: "true"
         pod-modifier.solace.com/modify.podDefinition: |
-          {"Pods":[{"metadata":{"name":"{{ .Release.Name }}-pubsubplus-2"},"spec":{"containers": [{"name": "pubsubplus","resources": {"limits": {"cpu": "0.2","memory": "0.8Gi"},"requests": {"cpu": "0.5","memory": "2Gi"} }} ] } } ]}
+          {"Pods":[{"metadata":{"name":"{{ .Release.Name }}-pubsubplus-2"},"spec":{"containers": [{"name": "pubsubplus","resources": {"requests": {"cpu": "0.2","memory": "0.8Gi"},"limits": {"cpu": "0.5","memory": "2Gi"} }} ] } } ]}
     spec:
 ```
 
