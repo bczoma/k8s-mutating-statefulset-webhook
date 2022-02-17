@@ -33,4 +33,5 @@ require (
 	k8s.io/apiserver v0.0.0-20180313225939-8e2fdf029740 // indirect
 	k8s.io/kube-openapi v0.0.0-20180216212618-50ae88d24ede // indirect
 	k8s.io/kubernetes v1.9.4
+	github.com/mattbaird/jsonpatch v0.0.0-20200820163806-098863c1fc24
 )
